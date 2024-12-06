@@ -7,7 +7,7 @@ Created on Fri Dec  6 12:08:44 2024
 from netmiko import ConnectHandler
 import logging
 
-# Logging setup
+# Setup logging
 logging.basicConfig(filename='network_config.log', level=logging.INFO, 
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -18,67 +18,92 @@ routers = [
         'ip': '192.168.56.101',
         'username': 'cisco',
         'password': 'cisco123!',
-        'interfaces': [
-            ('loopback0', '192.168.1.1 255.255.255.0', 'Primary Loopback'),
-            ('gigabitEthernet0/1', '192.168.3.1 255.255.255.0', 'Primary Interface')
+        'interface_commands': [
+            'interface loopback0',
+            'ip address 192.168.1.1 255.255.255.0',
+            'no shutdown',
+            'description Loopback Interface Configured by Script',
+            'interface gigabitEthernet0/1',
+            'ip address 192.168.2.1 255.255.255.0',
+            'no shutdown',
+            'description Main Interface Configured by Script'
         ],
-        'ospf_networks': ['192.168.1.0 0.0.0.255', '192.168.3.0 0.0.0.255']
+        'ospf_commands': [
+            'router ospf 1',
+            'network 192.168.1.0 0.0.0.255 area 0',
+            'network 192.168.2.0 0.0.0.255 area 0',
+            'exit'
+        ]
     },
     {
         'device_type': 'cisco_ios',
         'ip': '192.168.56.102',
         'username': 'cisco',
         'password': 'cisco123!',
-        'interfaces': [
-            ('loopback0', '192.168.4.1 255.255.255.0', 'Secondary Loopback'),
-            ('gigabitEthernet0/2', '192.168.5.1 255.255.255.0', 'Secondary Interface')
+        'interface_commands': [
+            'interface loopback1',
+            'ip address 192.168.3.1 255.255.255.0',
+            'no shutdown',
+            'description Loopback Interface 1 Configured by Script',
+            'interface gigabitEthernet0/2',
+            'ip address 192.168.4.1 255.255.255.0',
+            'no shutdown',
+            'description Main Interface 2 Configured by Script'
         ],
-        'ospf_networks': ['192.168.4.0 0.0.0.255', '192.168.5.0 0.0.0.255']
+        'ospf_commands': [
+            'router ospf 1',
+            'network 192.168.3.0 0.0.0.255 area 0',
+            'network 192.168.4.0 0.0.0.255 area 0',
+            'exit'
+        ]
     }
 ]
 
-# Function to configure a router
+# Function to configure a single router
 def configure_router(router):
     try:
-        print(f"Connecting to router {router['ip']}...")
+        print(f"Connecting to router at {router['ip']}...")
         connection = ConnectHandler(**router)
-        logging.info(f"Connection established with router {router['ip']}.")
+        logging.info(f"Connection established with router at {router['ip']}.")
+        print("Connected successfully!")
 
         # Configure interfaces
-        print(f"Configuring interfaces for router {router['ip']}...")
-        for interface, ip, description in router['interfaces']:
-            commands = [
-                f"interface {interface}",
-                f"ip address {ip}",
-                "no shutdown",
-                f"description {description}"
-            ]
-            interface_output = connection.send_config_set(commands)
-            logging.info(f"Interface configuration output for {router['ip']}:\n{interface_output}")
+        print(f"Configuring interfaces for router at {router['ip']}...")
+        interface_output = connection.send_config_set(router['interface_commands'])
+        print("Interface configuration applied successfully!")
+        logging.info(f"Interface configuration commands sent to {router['ip']}:\n{interface_output}")
+
+        # Verify interface configuration
+        print(f"Verifying interface configuration for router at {router['ip']}...")
+        interface_verification = connection.send_command("show ip interface brief")
+        print(f"Current Interface Configuration for {router['ip']}:\n{interface_verification}")
+        logging.info(f"Interface Verification Output for {router['ip']}:\n{interface_verification}")
 
         # Configure OSPF
-        print(f"Configuring OSPF for router {router['ip']}...")
-        ospf_commands = ['router ospf 1'] + [
-            f"network {network} area 0" for network in router['ospf_networks']
-        ]
-        ospf_output = connection.send_config_set(ospf_commands)
-        logging.info(f"OSPF configuration output for {router['ip']}:\n{ospf_output}")
+        print(f"Configuring OSPF for router at {router['ip']}...")
+        ospf_output = connection.send_config_set(router['ospf_commands'])
+        print("OSPF configuration applied successfully!")
+        logging.info(f"OSPF configuration commands sent to {router['ip']}:\n{ospf_output}")
 
-        # Verify OSPF
-        print(f"Verifying OSPF configuration for router {router['ip']}...")
+        # Verify OSPF configuration
+        print(f"Verifying OSPF configuration for router at {router['ip']}...")
         ospf_verification = connection.send_command("show ip protocols")
-        print(f"OSPF Verification Output for {router['ip']}:\n{ospf_verification}")
-        logging.info(f"OSPF Verification Output for {router['ip']}:\n{ospf_verification}")
+        print(f"OSPF Protocol Details for {router['ip']}:\n{ospf_verification}")
+        logging.info(f"OSPF Protocol Verification Output for {router['ip']}:\n{ospf_verification}")
 
+        # Disconnect
         connection.disconnect()
-        logging.info(f"Disconnected from router {router['ip']}.")
-        print(f"Disconnected from router {router['ip']} successfully.")
-
+        logging.info(f"Disconnected from router at {router['ip']}.")
+        print(f"Disconnected successfully from router at {router['ip']}.")
     except Exception as e:
-        logging.error(f"An error occurred with router {router['ip']}: {e}")
-        print(f"An error occurred with router {router['ip']}: {e}")
+        logging.error(f"An error occurred with router at {router['ip']}: {e}")
+        print(f"An error occurred with router at {router['ip']}: {e}")
 
-# Main script to configure all routers
+# Main script
+if __name__ == "__main__":
+    for router in routers:
+        configure_router(router)
+
 if __name__ == "__main__":
     for router in routers:
         configure_router(router)
