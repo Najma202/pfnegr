@@ -1,23 +1,18 @@
-from flask import Flask, request, jsonify
 from netmiko import ConnectHandler
 import logging
 
-# Flask app setup
-app = Flask(__name__)
-
-# Logging setup
 logging.basicConfig(filename='network_config.log', level=logging.INFO, 
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Default router configuration
-default_router = {
-    'device_type': 'cisco_ios',
-    'ip': '192.168.56.101',  
-    'username': 'cisco',     
-    'password': 'cisco123!'  
-}
+routers = [
+    {
+        'device_type': 'cisco_ios',
+        'ip': '192.168.56.101',
+        'username': 'cisco',
+        'password': 'cisco123!'
+    },
+]
 
-# Interface commands
 interface_commands = [
     'interface loopback0',
     'ip address 192.168.1.1 255.255.255.0',
@@ -26,14 +21,13 @@ interface_commands = [
     'interface Loopback1',
     'ip address 192.168.2.1 255.255.255.0',
     'no shutdown',
-    'description second Loopback Interface',
+    'description Second Loopback Interface',
     'interface gigabitEthernet0/1',
     'ip address 192.168.2.1 255.255.255.0',
     'no shutdown',
     'description Main Interface'
 ]
 
-# OSPF commands
 ospf_commands = [
     'router ospf 1',
     'network 192.168.1.0 0.0.0.255 area 0', 
@@ -41,80 +35,41 @@ ospf_commands = [
     'exit'
 ]
 
-# Flask route to configure the router
-@app.route('/configure', methods=['POST'])
-def configure_router():
+def configure_router(router):
     try:
-        # Get data from the POST request
-        data = request.json
-        
-        # Use provided router details or default
-        router = {
-            'device_type': 'cisco_ios',
-            'ip': data.get('ip', default_router['ip']),
-            'username': data.get('username', default_router['username']),
-            'password': data.get('password', default_router['password'])
-        }
-        
-        commands = data.get('commands', interface_commands + ospf_commands)
-        
-        print(f"Connecting to the router {router['ip']}...")
+        print(f"Connecting to {router['ip']}...")
         connection = ConnectHandler(**router)
-        logging.info(f"Connection established with the router {router['ip']}.")
-        
-        print("Sending configuration commands...")
-        output = connection.send_config_set(commands)
-        logging.info(f"Configuration commands sent:\n{output}")
-        
-        # Save the configuration
-        connection.send_command('write memory')
-        logging.info(f"Configuration saved on router {router['ip']}.")
-        
-        connection.disconnect()
-        logging.info(f"Disconnected from router {router['ip']}.")
-        print("Configuration complete and disconnected.")
-        
-        return jsonify({"status": "success", "message": "Configuration applied successfully", "output": output}), 200
-    except Exception as e:
-        logging.error(f"Error configuring router: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        logging.info(f"Connected to {router['ip']}.")
+        print(f"Connected to {router['ip']}!")
 
-# Flask route to verify interface and OSPF configuration
-@app.route('/verify', methods=['POST'])
-def verify_router():
-    try:
-        # Get data from the POST request
-        data = request.json
-        
-        # Use provided router details or default
-        router = {
-            'device_type': 'cisco_ios',
-            'ip': data.get('ip', default_router['ip']),
-            'username': data.get('username', default_router['username']),
-            'password': data.get('password', default_router['password'])
-        }
-        
-        print(f"Connecting to the router {router['ip']} for verification...")
-        connection = ConnectHandler(**router)
-        logging.info(f"Connection established with the router {router['ip']} for verification.")
-        
-        print("Verifying interface configuration...")
+        print("Configuring interfaces...")
+        interface_output = connection.send_config_set(interface_commands)
+        print("Interfaces configured!")
+        logging.info(f"Interface commands for {router['ip']}:\n{interface_output}")
+
+        print("Verifying interfaces...")
         interface_verification = connection.send_command("show ip interface brief")
-        print("Verifying OSPF configuration...")
-        ospf_verification = connection.send_command("show ip protocols")
-        
-        connection.disconnect()
-        logging.info(f"Disconnected from router {router['ip']} after verification.")
-        
-        return jsonify({
-            "status": "success",
-            "interface_verification": interface_verification,
-            "ospf_verification": ospf_verification
-        }), 200
-    except Exception as e:
-        logging.error(f"Error verifying router: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        print(f"Interfaces on {router['ip']}:\n{interface_verification}")
+        logging.info(f"Interface verification for {router['ip']}:\n{interface_verification}")
 
-# Run the Flask app
-if __name__ == '__main__':
-    app.run(debug=True)
+        print("Configuring OSPF...")
+        ospf_output = connection.send_config_set(ospf_commands)
+        print("OSPF configured!")
+        logging.info(f"OSPF commands for {router['ip']}:\n{ospf_output}")
+
+        print("Verifying OSPF...")
+        ospf_verification = connection.send_command("show ip protocols")
+        print(f"OSPF on {router['ip']}:\n{ospf_verification}")
+        logging.info(f"OSPF verification for {router['ip']}:\n{ospf_verification}")
+
+        connection.disconnect()
+        logging.info(f"Disconnected from {router['ip']}.")
+        print(f"Disconnected from {router['ip']}.")
+
+    except Exception as e:
+        logging.error(f"Error with {router['ip']}: {e}")
+        print(f"Error with {router['ip']}: {e}")
+
+if __name__ == "__main__":
+    for router in routers:
+        configure_router(router)
