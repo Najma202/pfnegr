@@ -17,12 +17,6 @@ routers = [
         'username': 'cisco',
         'password': 'cisco123!'
     },
-    {
-        'device_type': 'cisco_ios',
-        'ip': '192.168.56.102',
-        'username': 'cisco',
-        'password': 'cisco123!'
-    }
 ]
 
 interface_commands = [
@@ -47,12 +41,12 @@ def configure_router(router):
     try:
         print(f"Connecting to router {router['ip']}...")
         connection = ConnectHandler(**router)
-        logging.info(f"Connection established with router {router['ip']}.")
+        logging.info(f"Connection established {router['ip']}.")
         print(f"Connected to router {router['ip']} successfully!")
 
         print("Configuring interfaces...")
         interface_output = connection.send_config_set(interface_commands)
-        print("Interface configuration applied successfully!")
+        print("Interface configured successfully!")
         logging.info(f"Interface configuration commands sent for {router['ip']}:\n{interface_output}")
 
         print("Verifying interface configuration...")
