@@ -1,87 +1,99 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Dec  6 11:44:51 2024
-
-@author: najma
-"""
 
 from netmiko import ConnectHandler
-import tkinter as tk
-from tkinter import messagebox
 import logging
 
 logging.basicConfig(filename='network_config.log', level=logging.INFO, 
                     format='%(asctime)s - %(levelname)s - %(message)s')
-
-router = {
-    'device_type': 'cisco_ios',
-    'ip': '192.168.56.101',
-    'username': 'cisco',
-    'password': 'cisco123!',
-}
+routers = [
+    {
+        'device_type': 'cisco_ios',
+        'ip': '192.168.56.101',
+        'username': 'cisco',
+        'password': 'cisco123!'
+    },
+]
 
 interface_commands = [
     'interface loopback0',
     'ip address 192.168.1.1 255.255.255.0',
     'no shutdown',
     'description Loopback Interface',
-    'interface loopback1',
+    'interface Loopback1',
     'ip address 192.168.2.1 255.255.255.0',
     'no shutdown',
     'description Second Loopback Interface',
     'interface gigabitEthernet0/1',
-    'ip address 192.168.3.1 255.255.255.0',
+    'ip address 192.168.2.1 255.255.255.0',
     'no shutdown',
-    'description Main GigabitEthernet Interface',
+    'description Main Interface'
 ]
 
 ospf_commands = [
     'router ospf 1',
-    'network 192.168.1.0 0.0.0.255 area 0',
+    'network 192.168.1.0 0.0.0.255 area 0', 
     'network 192.168.2.0 0.0.0.255 area 0',
-    'network 192.168.3.0 0.0.0.255 area 0',
+    'exit'
 ]
 
-ping_targets = ['192.168.1.1', '192.168.2.1', '192.168.3.1']
-
-def configure_interfaces():
+def backup_config(connection, router_ip):
+    """ Backs up the router's running configuration """
+    print("Backing up running configuration...")
     try:
-        connection = ConnectHandler(**router)
-        connection.send_config_set(interface_commands)
-        connection.disconnect()
-        messagebox.showinfo("Success", "Interfaces configured successfully!")
+        output = connection.send_command("show running-config")
+        with open(f"backup_{router_ip}.txt", "w") as backup_file:
+            backup_file.write(output)
+        logging.info(f"Backup saved for {router_ip}")
+        print(f"Running configuration backed up to backup_{router_ip}.txt")
     except Exception as e:
-        messagebox.showerror("Error", f"Failed to configure interfaces: {e}")
+        logging.error(f"Failed to back up config for {router_ip}: {e}")
+        print(f"Error backing up configuration: {e}")
 
-def configure_ospf():
+def verify_ospf_neighbors(connection, router_ip):
+    """ Verifies OSPF neighbor relationships """
+    print("Verifying OSPF neighbors...")
     try:
-        connection = ConnectHandler(**router)
-        connection.send_config_set(ospf_commands)
-        connection.disconnect()
-        messagebox.showinfo("Success", "OSPF configured successfully!")
+        output = connection.send_command("show ip ospf neighbor")
+        print(f"OSPF Neighbors for {router_ip}:\n{output}")
+        logging.info(f"OSPF neighbors verification for {router_ip}:\n{output}")
     except Exception as e:
-        messagebox.showerror("Error", f"Failed to configure OSPF: {e}")
+        logging.error(f"Failed to verify OSPF neighbors on {router_ip}: {e}")
+        print(f"Error verifying OSPF neighbors: {e}")
 
-def test_ping():
+def configure_router(router):
     try:
+        print(f"Connecting to {router['ip']}...")
         connection = ConnectHandler(**router)
-        results = []
-        for ip in ping_targets:
-            result = connection.send_command(f"ping {ip}")
-            results.append(f"Ping {ip}: {result}")
+        logging.info(f"Connected to {router['ip']}.")
+        print(f"Connected to {router['ip']}!")
+
+        print("Configuring interfaces...")
+        interface_output = connection.send_config_set(interface_commands)
+        print("Interfaces configured!")
+        logging.info(f"Interface commands for {router['ip']}:\n{interface_output}")
+
+        print("Verifying interfaces...")
+        interface_verification = connection.send_command("show ip interface brief")
+        print(f"Interfaces on {router['ip']}:\n{interface_verification}")
+        logging.info(f"Interface verification for {router['ip']}:\n{interface_verification}")
+
+        print("Configuring OSPF...")
+        ospf_output = connection.send_config_set(ospf_commands)
+        print("OSPF configured!")
+        logging.info(f"OSPF commands for {router['ip']}:\n{ospf_output}")
+
+        print("Verifying OSPF...")
+        ospf_verification = connection.send_command("show ip protocols")
+        print(f"OSPF on {router['ip']}:\n{ospf_verification}")
+        logging.info(f"OSPF verification for {router['ip']}:\n{ospf_verification}")
+
         connection.disconnect()
-        result_text = "\n".join(results)
-        messagebox.showinfo("Ping Results", result_text)
+        logging.info(f"Disconnected from {router['ip']}.")
+        print(f"Disconnected from {router['ip']}.")
+
     except Exception as e:
-        messagebox.showerror("Error", f"Ping test failed: {e}")
+        logging.error(f"Error with {router['ip']}: {e}")
+        print(f"Error with {router['ip']}: {e}")
 
-root = tk.Tk()
-root.title("Network Configuration Tool")
-
-tk.Label(root, text="Simple Network Configuration").pack(pady=10)
-
-tk.Button(root, text="Configure Interfaces", command=configure_interfaces, width=25).pack(pady=5)
-tk.Button(root, text="Configure OSPF", command=configure_ospf, width=25).pack(pady=5)
-tk.Button(root, text="Test Ping", command=test_ping, width=25).pack(pady=5)
-
-root.mainloop()
+if __name__ == "__main__":
+    for router in routers:
+        configure_router(router)
