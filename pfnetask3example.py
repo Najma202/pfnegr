@@ -35,40 +35,22 @@ ospf_commands = [
     'exit'
 ]
 
-# New function to verify OSPF routing table
-def verify_ospf_routing_table(connection):
+# New function to backup the running configuration of the router
+def backup_configuration(connection, router_ip):
     try:
-        print("Verifying OSPF routing table...")
-        output = connection.send_command("show ip ospf route")
-        print(f"OSPF routing table:\n{output}")
-        logging.info(f"OSPF routing table:\n{output}")
+        print(f"Backing up running configuration for {router_ip}...")
+        output = connection.send_command("show running-config")
+        backup_filename = f"backup_{router_ip}.txt"
+        
+        # Write the output of the running configuration to a backup file
+        with open(backup_filename, 'w') as backup_file:
+            backup_file.write(output)
+        
+        print(f"Running configuration backed up to {backup_filename}.")
+        logging.info(f"Running configuration for {router_ip} backed up to {backup_filename}.")
     except Exception as e:
-        logging.error(f"Error verifying OSPF routing table: {e}")
-        print(f"Error verifying OSPF routing table: {e}")
-
-# New function to save configuration to startup
-def save_configuration(connection):
-    try:
-        print("Saving configuration to startup...")
-        output = connection.send_command("write memory")
-        print(f"Configuration saved: {output}")
-        logging.info(f"Configuration saved: {output}")
-    except Exception as e:
-        logging.error(f"Error saving configuration: {e}")
-        print(f"Error saving configuration: {e}")
-
-# New function to check interface status
-def check_interface_status(connection, interface):
-    try:
-        print(f"Checking status of {interface}...")
-        output = connection.send_command(f"show interface {interface} status")
-        print(f"Interface {interface} status:\n{output}")
-        logging.info(f"Interface {interface} status:\n{output}")
-        return output
-    except Exception as e:
-        logging.error(f"Error checking interface {interface} status: {e}")
-        print(f"Error checking interface {interface} status: {e}")
-        return None
+        logging.error(f"Error backing up configuration for {router_ip}: {e}")
+        print(f"Error backing up configuration for {router_ip}: {e}")
 
 def configure_router(router):
     try:
@@ -77,29 +59,28 @@ def configure_router(router):
         logging.info(f"Connected to {router['ip']}.")
         print(f"Connected to {router['ip']}!")
 
-        # Check and configure interfaces
-        for interface in ['Loopback0', 'Loopback1', 'GigabitEthernet0/1']:
-            interface_status = check_interface_status(connection, interface)
-            if interface_status and "notconnect" not in interface_status.lower():
-                print(f"{interface} is already configured or in use. Skipping configuration.")
-                logging.info(f"{interface} is already configured or in use. Skipping configuration.")
-            else:
-                print(f"Configuring {interface}...")
-                interface_output = connection.send_config_set(interface_commands)
-                print(f"{interface} configured!")
-                logging.info(f"{interface} configuration:\n{interface_output}")
+        # Backup the current running configuration before making any changes
+        backup_configuration(connection, router['ip'])
 
-        # Configuring OSPF
+        print("Configuring interfaces...")
+        interface_output = connection.send_config_set(interface_commands)
+        print("Interfaces configured!")
+        logging.info(f"Interface commands for {router['ip']}:\n{interface_output}")
+
+        print("Verifying interfaces...")
+        interface_verification = connection.send_command("show ip interface brief")
+        print(f"Interfaces on {router['ip']}:\n{interface_verification}")
+        logging.info(f"Interface verification for {router['ip']}:\n{interface_verification}")
+
         print("Configuring OSPF...")
         ospf_output = connection.send_config_set(ospf_commands)
         print("OSPF configured!")
         logging.info(f"OSPF commands for {router['ip']}:\n{ospf_output}")
 
-        # Verify OSPF routing table
-        verify_ospf_routing_table(connection)
-
-        # Save the configuration
-        save_configuration(connection)
+        print("Verifying OSPF...")
+        ospf_verification = connection.send_command("show ip protocols")
+        print(f"OSPF on {router['ip']}:\n{ospf_verification}")
+        logging.info(f"OSPF verification for {router['ip']}:\n{ospf_verification}")
 
         connection.disconnect()
         logging.info(f"Disconnected from {router['ip']}.")
@@ -111,7 +92,5 @@ def configure_router(router):
 
 if __name__ == "__main__":
     for router in routers:
-        configure_router(router)
-
         configure_router(router)
 
